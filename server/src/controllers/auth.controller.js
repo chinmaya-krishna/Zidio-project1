@@ -21,14 +21,16 @@ const setCookies = (res, accessToken, refreshToken) => {
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
     maxAge: 15 * 60 * 1000, // 15 minutes
+    path: '/',
   });
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
   });
 };
 
@@ -36,6 +38,11 @@ const setCookies = (res, accessToken, refreshToken) => {
 export const signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -59,6 +66,7 @@ export const signup = async (req, res) => {
 
     res.status(201).json({
       message: 'Account created successfully',
+      token: accessToken,
       user: {
         _id: user._id,
         name: user.name,
@@ -68,10 +76,11 @@ export const signup = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('Signup error:', error);
     if (error.code === 11000) {
       return res.status(400).json({ message: 'Email already exists' });
     }
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message || 'Signup failed' });
   }
 };
 
@@ -79,6 +88,11 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
 
     // Check if user exists
     const user = await User.findOne({ email });
@@ -104,6 +118,7 @@ export const login = async (req, res) => {
 
     res.status(200).json({
       message: 'Login successful',
+      token: accessToken,
       user: {
         _id: user._id,
         name: user.name,
@@ -113,7 +128,8 @@ export const login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Login error:', error);
+    res.status(500).json({ message: error.message || 'Login failed' });
   }
 };
 
@@ -123,13 +139,24 @@ export const logout = async (req, res) => {
     // Clear refresh token from DB
     await User.findByIdAndUpdate(req.user._id, { refreshToken: '' });
 
-    // Clear cookies
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    // Clear cookies with same options as when set
+    res.clearCookie('accessToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+      path: '/',
+    });
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+      path: '/',
+    });
 
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Logout error:', error);
+    res.status(500).json({ message: error.message || 'Logout failed' });
   }
 };
 

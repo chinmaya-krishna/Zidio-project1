@@ -3,9 +3,12 @@ import User from '../models/user.model.js';
 
 export const protect = async (req, res, next) => {
   try {
-    // Get token from cookie or header
-    const token = req.cookies.accessToken || 
-                  req.headers.authorization?.split(' ')[1];
+    // Get token from cookie first, then Authorization header
+    let token = req.cookies.accessToken;
+    
+    if (!token && req.headers.authorization) {
+      token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
       return res.status(401).json({ 
@@ -19,8 +22,15 @@ export const protect = async (req, res, next) => {
     // Get user from token
     req.user = await User.findById(decoded.id).select('-password');
 
+    if (!req.user) {
+      return res.status(401).json({ 
+        message: 'User not found' 
+      });
+    }
+
     next();
   } catch (error) {
+    console.error('Auth error:', error.message);
     return res.status(401).json({ 
       message: 'Not authorized, token failed' 
     });
