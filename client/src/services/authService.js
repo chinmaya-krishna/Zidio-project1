@@ -14,8 +14,15 @@ export const login = async (data) => {
 
 // Logout
 export const logout = async () => {
-  const response = await api.post('/api/auth/logout');
-  return response.data;
+  try {
+    const response = await api.post('/api/auth/logout');
+    return response.data;
+  } catch (error) {
+    // Even if logout API fails, don't throw - let frontend handle it
+    console.error('Logout API error:', error);
+    // Return success anyway since frontend will clear state
+    return { message: 'Logout completed' };
+  }
 };
 
 // Get current user

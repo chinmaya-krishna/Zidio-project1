@@ -48,9 +48,17 @@ const Dashboard = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    logoutStore();
-    navigate('/login');
+    try {
+      await logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      // Always clear local state even if API call fails
+      logoutStore();
+      // Clear all app state and navigate
+      queryClient.clear();
+      navigate('/login');
+    }
   };
 
   const handleDeleteMeeting = async (id: string) => {
@@ -98,39 +106,43 @@ const Dashboard = () => {
           {/* Create Meeting */}
           <div className="bg-gray-800 p-6 rounded-xl">
             <h2 className="text-lg font-semibold mb-4">Create Meeting</h2>
-            <input
-              type="text"
-              value={meetingTitle}
-              onChange={(e) => setMeetingTitle(e.target.value)}
-              placeholder="Meeting title"
-              className="w-full bg-gray-700 text-white p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleCreateMeeting}
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Creating...' : '+ New Meeting'}
-            </button>
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateMeeting(); }}>
+              <input
+                type="text"
+                value={meetingTitle}
+                onChange={(e) => setMeetingTitle(e.target.value)}
+                placeholder="Meeting title"
+                className="w-full bg-gray-700 text-white p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
+              >
+                {loading ? 'Creating...' : '+ New Meeting'}
+              </button>
+            </form>
           </div>
 
           {/* Join Meeting */}
           <div className="bg-gray-800 p-6 rounded-xl">
             <h2 className="text-lg font-semibold mb-4">Join Meeting</h2>
-            <input
-              type="text"
-              value={meetingCode}
-              onChange={(e) => setMeetingCode(e.target.value)}
-              placeholder="Enter meeting code"
-              className="w-full bg-gray-700 text-white p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <button
-              onClick={handleJoinMeeting}
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Joining...' : 'Join Meeting'}
-            </button>
+            <form onSubmit={(e) => { e.preventDefault(); handleJoinMeeting(); }}>
+              <input
+                type="text"
+                value={meetingCode}
+                onChange={(e) => setMeetingCode(e.target.value)}
+                placeholder="Enter meeting code"
+                className="w-full bg-gray-700 text-white p-3 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
+              >
+                {loading ? 'Joining...' : 'Join Meeting'}
+              </button>
+            </form>
           </div>
         </div>
 

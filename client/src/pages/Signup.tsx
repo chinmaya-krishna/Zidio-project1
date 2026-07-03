@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signup } from '../services/authService';
-import useAuthStore from '../store/authStore';
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { setUser } = useAuthStore();
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,9 +17,9 @@ const Signup = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await signup(formData);
-      setUser(data.user);
-      navigate('/dashboard');
+      await signup(formData);
+      // Don't auto-login, just navigate to login page
+      navigate('/login');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Signup failed');
     } finally {
@@ -79,6 +77,7 @@ const Signup = () => {
               value={formData.password}
               onChange={handleChange}
               required
+              autoComplete="new-password"
               className="w-full bg-gray-700 text-white p-3 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter your password"
             />

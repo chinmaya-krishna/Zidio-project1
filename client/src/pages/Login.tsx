@@ -20,9 +20,15 @@ const Login = () => {
     setError('');
     try {
       const data = await login(formData);
+      console.log('Token from response:', data.token);
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        console.log('Token saved to localStorage:', localStorage.getItem('token'));
+      }
       setUser(data.user);
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
@@ -69,6 +75,7 @@ const Login = () => {
               value={formData.password}
               onChange={handleChange}
               required
+              autoComplete="current-password"
               className="w-full bg-gray-700 text-white p-3 rounded-lg mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter your password"
             />
