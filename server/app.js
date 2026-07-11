@@ -13,8 +13,32 @@ const app = express();
 
 // Security & Middleware
 app.use(helmet());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://localhost:5173',
+  process.env.CLIENT_URL,
+  process.env.RENDER_CLIENT_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+].filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  return allowedOrigins.includes(origin) ||
+    /\.vercel\.app$/i.test(origin) ||
+    /\.vercel\.dev$/i.test(origin) ||
+    /\.onrender\.com$/i.test(origin);
+};
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

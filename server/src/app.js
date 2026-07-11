@@ -18,16 +18,24 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://localhost:5173',
   process.env.CLIENT_URL,
   process.env.RENDER_CLIENT_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
 ].filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  return allowedOrigins.includes(origin) ||
+    /\.vercel\.app$/i.test(origin) ||
+    /\.vercel\.dev$/i.test(origin) ||
+    /\.onrender\.com$/i.test(origin);
+};
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);

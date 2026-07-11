@@ -1,9 +1,28 @@
 import { Server } from 'socket.io';
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  return origin === 'http://localhost:5173' ||
+    origin === 'http://localhost:3000' ||
+    origin === 'https://localhost:5173' ||
+    origin === process.env.CLIENT_URL ||
+    origin === process.env.RENDER_CLIENT_URL ||
+    /\.vercel\.app$/i.test(origin) ||
+    /\.vercel\.dev$/i.test(origin) ||
+    /\.onrender\.com$/i.test(origin);
+};
+
 const configureSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('CORS not allowed'));
+        }
+      },
       credentials: true,
     },
   });
