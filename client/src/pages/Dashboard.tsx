@@ -10,7 +10,8 @@ const Dashboard = () => {
   const { user, logout: logoutStore } = useAuthStore();
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingJoin, setLoadingJoin] = useState(false);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 
@@ -19,9 +20,10 @@ const Dashboard = () => {
     queryFn: getMyMeetings,
   });
 
-  const handleCreateMeeting = async () => {
+  const handleCreateMeeting = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!meetingTitle) return;
-    setLoading(true);
+    setLoadingCreate(true);
     setError('');
     try {
       const data = await createMeeting({ title: meetingTitle });
@@ -29,13 +31,14 @@ const Dashboard = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create meeting');
     } finally {
-      setLoading(false);
+      setLoadingCreate(false);
     }
   };
 
-  const handleJoinMeeting = async () => {
+  const handleJoinMeeting = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!meetingCode) return;
-    setLoading(true);
+    setLoadingJoin(true);
     setError('');
     try {
       const data = await joinMeeting(meetingCode.trim().toUpperCase());
@@ -43,7 +46,7 @@ const Dashboard = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to join meeting');
     } finally {
-      setLoading(false);
+      setLoadingJoin(false);
     }
   };
 
@@ -62,15 +65,14 @@ const Dashboard = () => {
   };
 
   const handleDeleteMeeting = async (id: string) => {
-    setLoading(true);
+    setLoadingCreate(false);
+    setLoadingJoin(false);
     setError('');
     try {
       await deleteMeeting(id);
       queryClient.invalidateQueries({ queryKey: ['meetings'] });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete meeting');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -106,7 +108,7 @@ const Dashboard = () => {
           {/* Create Meeting */}
           <div className="bg-gray-800 p-6 rounded-xl">
             <h2 className="text-lg font-semibold mb-4">Create Meeting</h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleCreateMeeting(); }}>
+            <form onSubmit={handleCreateMeeting}>
               <input
                 type="text"
                 value={meetingTitle}
@@ -116,10 +118,10 @@ const Dashboard = () => {
               />
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loadingCreate}
                 className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
               >
-                {loading ? 'Creating...' : '+ New Meeting'}
+                {loadingCreate ? 'Creating...' : '+ New Meeting'}
               </button>
             </form>
           </div>
@@ -127,7 +129,7 @@ const Dashboard = () => {
           {/* Join Meeting */}
           <div className="bg-gray-800 p-6 rounded-xl">
             <h2 className="text-lg font-semibold mb-4">Join Meeting</h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleJoinMeeting(); }}>
+            <form onSubmit={handleJoinMeeting}>
               <input
                 type="text"
                 value={meetingCode}
@@ -137,10 +139,10 @@ const Dashboard = () => {
               />
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loadingJoin}
                 className="w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold transition disabled:opacity-50"
               >
-                {loading ? 'Joining...' : 'Join Meeting'}
+                {loadingJoin ? 'Joining...' : 'Join Meeting'}
               </button>
             </form>
           </div>
