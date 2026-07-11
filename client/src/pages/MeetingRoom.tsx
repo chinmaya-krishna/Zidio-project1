@@ -341,7 +341,7 @@ const RemoteVideo = ({ stream, name }: { stream: MediaStream; name: string }) =>
   }, [stream]);
 
   return (
-    <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center">
+    <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[240px]">
       <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
       <span className="absolute bottom-2 left-2 bg-black/60 text-xs px-2 py-1 rounded">{name}</span>
     </div>
@@ -351,7 +351,7 @@ const RemoteVideo = ({ stream, name }: { stream: MediaStream; name: string }) =>
 const PlaceholderTile = ({ name }: { name: string }) => {
   const initial = (name || 'U')[0].toUpperCase();
   return (
-    <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center">
+    <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[240px]">
       <div className="flex flex-col items-center gap-2">
         <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl">{initial}</div>
         <div className="text-xs text-gray-300">{name}</div>
