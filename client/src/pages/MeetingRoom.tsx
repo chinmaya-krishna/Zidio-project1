@@ -19,7 +19,9 @@ const MeetingRoom = () => {
   const [showJoinModal, setShowJoinModal] = useState(true);
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
+  const [messageNotification, setMessageNotification] = useState<string | null>(null);
   const isLeavingRef = useRef(false);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: meetingData } = useQuery({
     queryKey: ['meeting', id],
@@ -38,10 +40,12 @@ const MeetingRoom = () => {
     remoteUsers,
     isMicOn,
     isCameraOn,
+    isScreenSharing,
     isMediaLoading,
     mediaError,
     toggleMic,
     toggleCamera,
+    toggleScreenShare,
     cleanupMedia,
   } = useWebRTC(socket, id!, user?._id || '');
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -76,7 +80,20 @@ const MeetingRoom = () => {
 
     s.emit('meeting:join', { meetingId: id, user });
 
-    s.on('message:received', (message) => setMessages((prev) => [...prev, message]));
+    s.on('message:received', (message) => {
+      setMessages((prev) => [...prev, message]);
+      
+      // Show notification if message is from someone else
+      if (message.senderId !== user?._id) {
+        setMessageNotification(`${message.senderName}: ${message.content}`);
+        if (notificationTimeoutRef.current) {
+          clearTimeout(notificationTimeoutRef.current);
+        }
+        notificationTimeoutRef.current = setTimeout(() => {
+          setMessageNotification(null);
+        }, 5000);
+      }
+    });
     s.on('meeting:participants-updated', ({ participants: updated }) => setParticipants(updated));
 
     return () => {
@@ -184,7 +201,9 @@ const MeetingRoom = () => {
         </div>
         <div className="flex gap-2">
           <button onClick={handleLeaveMeeting} className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-sm transition">Leave Meeting</button>
-          <button onClick={handleEndMeeting} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm transition">End Meeting</button>
+          {meetingData?.meeting?.host?._id === user?._id && (
+            <button onClick={handleEndMeeting} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm transition">End Meeting</button>
+          )}
         </div>
       </div>
 
@@ -237,8 +256,16 @@ const MeetingRoom = () => {
             <div className="flex justify-center gap-2 sm:gap-4 py-3 sm:py-4 flex-wrap">
               <button onClick={async () => { try { await toggleMic(); } catch(e: any){ console.error('Mic error:', e); } }} disabled={isMediaLoading} className={`p-3 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${isMicOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isMicOn ? '🎤' : '🔇'}</button>
               <button onClick={async () => { try { await toggleCamera(); } catch(e){console.error(e)} }} disabled={isMediaLoading} className={`p-3 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${isCameraOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isCameraOn ? '📹' : '📷'}</button>
+              <button onClick={async () => { try { await toggleScreenShare(); } catch(e){console.error(e)} }} disabled={isMediaLoading} className={`p-3 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-700 hover:bg-gray-600'}`}>🖥️</button>
               <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 transition">💬</button>
             </div>
+            
+            {messageNotification && (
+              <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg max-w-sm z-30 animate-pulse">
+                <p className="text-sm font-semibold">📩 New Message</p>
+                <p className="text-xs mt-1 truncate">{messageNotification}</p>
+              </div>
+            )}
             
             {mediaError && <p className="text-center text-sm text-amber-400 mt-2">{mediaError}</p>}
           </div>

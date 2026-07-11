@@ -28,9 +28,11 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
   const [isMediaLoading, setIsMediaLoading] = useState(false);
   const [isMediaReady, setIsMediaReady] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
   const namesRef = useRef<Map<string, string>>(new Map());
   const streamRef = useRef<MediaStream | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const updateLocalVideo = () => {
     if (localVideoRef.current) {
@@ -146,22 +148,38 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
 
   const addTrackToPeers = async (track: MediaStreamTrack) => {
     if (!socket || !streamRef.current) return;
+    
+    console.log(`📤 Broadcasting ${track.kind} track to all peers...`);
+    
     for (const [remoteUserId, peer] of peersRef.current.entries()) {
-      const sender = peer.connection.getSenders().find((s) => s.track?.kind === track.kind);
-      if (sender) {
-        await sender.replaceTrack(track);
-      } else {
-        peer.connection.addTrack(track, streamRef.current);
-      }
+      try {
+        const sender = peer.connection.getSenders().find((s) => s.track?.kind === track.kind);
+        
+        if (sender) {
+          // Replace existing track
+          console.log(`🔄 Replacing ${track.kind} track for peer ${remoteUserId}`);
+          await sender.replaceTrack(track);
+        } else {
+          // Add new track if it doesn't exist
+          console.log(`➕ Adding new ${track.kind} track for peer ${remoteUserId}`);
+          peer.connection.addTrack(track, streamRef.current);
+        }
 
-      const offer = await peer.connection.createOffer();
-      await peer.connection.setLocalDescription(offer);
-      socket.emit('webrtc:offer', {
-        meetingId,
-        offer,
-        from: userId,
-        to: remoteUserId,
-      });
+        // Always renegotiate after track changes
+        if (peer.connection.signalingState === 'stable') {
+          const offer = await peer.connection.createOffer({ iceRestart: false });
+          await peer.connection.setLocalDescription(offer);
+          socket.emit('webrtc:offer', {
+            meetingId,
+            offer,
+            from: userId,
+            to: remoteUserId,
+          });
+          console.log(`✅ Sent new offer to ${remoteUserId} for ${track.kind} update`);
+        }
+      } catch (err) {
+        console.error(`Error updating track for peer ${remoteUserId}:`, err);
+      }
     }
   };
 
@@ -366,17 +384,70 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
     }
   };
 
+  const toggleScreenShare = async () => {
+    try {
+      if (isScreenSharing) {
+        // Stop screen sharing
+        if (screenTrackRef.current) {
+          const videoTrack = streamRef.current?.getVideoTracks()[0];
+          if (videoTrack) {
+            screenTrackRef.current.stop();
+            screenTrackRef.current = null;
+            
+            // Restore camera
+            await addTrackToPeers(videoTrack);
+          }
+        }
+        setIsScreenSharing(false);
+        console.log('✅ Screen sharing stopped');
+      } else {
+        // Start screen sharing
+        setIsMediaLoading(true);
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } } as any,
+          audio: false,
+        });
+
+        const screenTrack = screenStream.getVideoTracks()[0];
+        if (!screenTrack) {
+          throw new Error('No screen track');
+        }
+
+        screenTrackRef.current = screenTrack;
+
+        // Handle when user stops screen share from system UI
+        screenTrack.onended = () => {
+          toggleScreenShare();
+        };
+
+        // Replace video track with screen track
+        await addTrackToPeers(screenTrack);
+        setIsScreenSharing(true);
+        console.log('✅ Screen sharing started');
+      }
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError') {
+        console.error('Screen share error:', err);
+        setMediaError('Failed to share screen: ' + err.message);
+      }
+    } finally {
+      setIsMediaLoading(false);
+    }
+  };
+
   return {
     localVideoRef,
     localStream,
     remoteUsers,
     isMicOn,
     isCameraOn,
+    isScreenSharing,
     isMediaLoading,
     isMediaReady,
     mediaError,
     toggleMic,
     toggleCamera,
+    toggleScreenShare,
     prepareMedia,
     cleanupMedia,
   };

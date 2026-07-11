@@ -30,7 +30,10 @@ export const joinMeeting = async (req, res) => {
   try {
     const { meetingCode } = req.params;
 
-    const meeting = await Meeting.findOne({ meetingCode });
+    // Case-insensitive meeting code lookup
+    const meeting = await Meeting.findOne({ 
+      meetingCode: { $regex: `^${meetingCode}$`, $options: 'i' } 
+    });
     if (!meeting) {
       return res.status(404).json({ message: 'Meeting not found' });
     }
