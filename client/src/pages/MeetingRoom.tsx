@@ -20,6 +20,7 @@ const MeetingRoom = () => {
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
   const [messageNotification, setMessageNotification] = useState<string | null>(null);
+  const [screenShareUserId, setScreenShareUserId] = useState<string | null>(null);
   const isLeavingRef = useRef(false);
   const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -49,6 +50,7 @@ const MeetingRoom = () => {
     cleanupMedia,
   } = useWebRTC(socket, id!, user?._id || '');
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
 
   // Do NOT request media automatically on load. Let user opt-in via the join modal buttons.
 
@@ -64,7 +66,11 @@ const MeetingRoom = () => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = hasJoinedRoom && localStream?.getVideoTracks().length ? localStream : null;
     }
-  }, [localStream, hasJoinedRoom]);
+    if (screenVideoRef.current && screenShareUserId) {
+      const screenStream = remoteUsers.get(screenShareUserId)?.stream;
+      screenVideoRef.current.srcObject = screenStream || null;
+    }
+  }, [localStream, hasJoinedRoom, screenShareUserId, remoteUsers]);
 
   useEffect(() => {
     if (meetingData?.meeting?.participants) setParticipants(meetingData.meeting.participants);
@@ -95,11 +101,21 @@ const MeetingRoom = () => {
       }
     });
     s.on('meeting:participants-updated', ({ participants: updated }) => setParticipants(updated));
+    s.on('screen:share-started', ({ userId }: any) => {
+      console.log(`📺 ${userId} started screen sharing`);
+      setScreenShareUserId(userId);
+    });
+    s.on('screen:share-stopped', () => {
+      console.log('📺 Screen sharing stopped');
+      setScreenShareUserId(null);
+    });
 
     return () => {
       if (!isLeavingRef.current) s.emit('meeting:leave', { meetingId: id, user });
       s.off('message:received');
       s.off('meeting:participants-updated');
+      s.off('screen:share-started');
+      s.off('screen:share-stopped');
       s.disconnect();
       socketRef.current = null;
       setSocket(null);
@@ -210,7 +226,24 @@ const MeetingRoom = () => {
       {hasJoinedRoom ? (
         <div className="flex flex-1 overflow-hidden h-screen">
           <div className="flex-1 flex flex-col p-3 sm:p-4 min-h-0 w-full">
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 auto-rows-fr min-h-0 overflow-y-auto">
+            {/* Screen Share Display */}
+            {screenShareUserId && remoteUsers.get(screenShareUserId)?.stream && (
+              <div className="mb-3 rounded-lg overflow-hidden bg-black flex items-center justify-center h-96 sm:h-96 relative">
+                <video 
+                  ref={screenVideoRef}
+                  autoPlay 
+                  playsInline 
+                  muted={false}
+                  className="w-full h-full object-contain"
+                />
+                <span className="absolute top-4 left-4 bg-blue-600 text-white text-xs px-3 py-1 rounded">
+                  📺 {remoteUsers.get(screenShareUserId)?.name} is sharing screen
+                </span>
+              </div>
+            )}
+
+            {/* Video Grid */}
+            <div className={`flex-1 grid gap-2 sm:gap-3 auto-rows-fr min-h-0 overflow-y-auto ${screenShareUserId ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
               <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[220px]">
                 <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
                 <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/60 px-2 py-1 text-xs">
@@ -234,6 +267,8 @@ const MeetingRoom = () => {
                     seen.add(pid);
                     const remote = remoteUsers.get(pid);
                     if (remote && remote.stream) {
+                      // Skip screen share user in grid if screen is being shown
+                      if (screenShareUserId === pid) continue;
                       tiles.push(<RemoteVideo key={pid} stream={remote.stream} name={remote.name || p.name || p.user?.name || 'Guest'} />);
                     } else {
                       tiles.push(<PlaceholderTile key={pid} name={p.name || p.user?.name || 'Guest'} />);
@@ -244,6 +279,7 @@ const MeetingRoom = () => {
                   for (const [uid, remoteUser] of remoteUsers.entries()) {
                     if (uid === user?._id) continue;
                     if (seen.has(uid)) continue;
+                    if (screenShareUserId === uid) continue;
                     seen.add(uid);
                     tiles.push(<RemoteVideo key={uid} stream={remoteUser.stream} name={remoteUser.name || 'Guest'} />);
                   }
@@ -366,12 +402,20 @@ const RemoteVideo = ({ stream, name }: { stream: MediaStream; name: string }) =>
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
   }, [stream]);
 
   return (
     <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[240px]">
-      <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+      <video 
+        ref={videoRef} 
+        autoPlay 
+        playsInline 
+        muted={false}
+        className="w-full h-full object-cover" 
+      />
       <span className="absolute bottom-2 left-2 bg-black/60 text-xs px-2 py-1 rounded">{name}</span>
     </div>
   );

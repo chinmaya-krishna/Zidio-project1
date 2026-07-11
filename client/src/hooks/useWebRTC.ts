@@ -390,12 +390,13 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
         // Stop screen sharing
         if (screenTrackRef.current) {
           const videoTrack = streamRef.current?.getVideoTracks()[0];
-          if (videoTrack) {
+          if (videoTrack && videoTrack !== screenTrackRef.current) {
             screenTrackRef.current.stop();
             screenTrackRef.current = null;
             
             // Restore camera
             await addTrackToPeers(videoTrack);
+            socket?.emit('screen:share-stopped', { meetingId, userId });
           }
         }
         setIsScreenSharing(false);
@@ -403,33 +404,59 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
       } else {
         // Start screen sharing
         setIsMediaLoading(true);
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 } } as any,
-          audio: false,
-        });
+        
+        try {
+          // Try getDisplayMedia for screen capture
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { width: { ideal: 1920 }, height: { ideal: 1080 } } as any,
+            audio: false,
+          } as any);
 
-        const screenTrack = screenStream.getVideoTracks()[0];
-        if (!screenTrack) {
-          throw new Error('No screen track');
+          const screenTrack = screenStream.getVideoTracks()[0];
+          if (!screenTrack) {
+            throw new Error('No screen track');
+          }
+
+          screenTrackRef.current = screenTrack;
+
+          // Handle when user stops screen share from system UI
+          screenTrack.onended = async () => {
+            // Restore camera automatically
+            const videoTrack = streamRef.current?.getVideoTracks().find(t => t !== screenTrackRef.current);
+            if (videoTrack) {
+              screenTrackRef.current = null;
+              await addTrackToPeers(videoTrack);
+              setIsScreenSharing(false);
+              socket?.emit('screen:share-stopped', { meetingId, userId });
+            }
+          };
+
+          // Replace video track with screen track and broadcast
+          await addTrackToPeers(screenTrack);
+          
+          // Also display it locally so presenter can see
+          if (localVideoRef.current) {
+            const screenStream2 = new MediaStream([screenTrack]);
+            localVideoRef.current.srcObject = screenStream2;
+          }
+          
+          socket?.emit('screen:share-started', { meetingId, userId });
+          setIsScreenSharing(true);
+          console.log('✅ Screen sharing started');
+        } catch (err: any) {
+          if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+            console.log('User cancelled screen share');
+          } else if (err.name === 'NotSupportedError') {
+            setMediaError('Screen sharing is not supported on this device');
+          } else {
+            console.error('Screen share error:', err);
+            setMediaError('Failed to share screen: ' + err.message);
+          }
         }
-
-        screenTrackRef.current = screenTrack;
-
-        // Handle when user stops screen share from system UI
-        screenTrack.onended = () => {
-          toggleScreenShare();
-        };
-
-        // Replace video track with screen track
-        await addTrackToPeers(screenTrack);
-        setIsScreenSharing(true);
-        console.log('✅ Screen sharing started');
       }
     } catch (err: any) {
-      if (err.name !== 'NotAllowedError') {
-        console.error('Screen share error:', err);
-        setMediaError('Failed to share screen: ' + err.message);
-      }
+      console.error('Screen share error:', err);
+      setMediaError('Failed to share screen: ' + err.message);
     } finally {
       setIsMediaLoading(false);
     }

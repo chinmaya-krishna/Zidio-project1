@@ -109,6 +109,16 @@ const configureSocket = (server) => {
       socket.to(meetingId).emit('meeting:mute', { userId, isMuted });
     });
 
+    socket.on('screen:share-started', ({ meetingId, userId }) => {
+      socket.to(meetingId).emit('screen:share-started', { userId });
+      console.log(`📺 ${userId} started screen sharing in meeting ${meetingId}`);
+    });
+
+    socket.on('screen:share-stopped', ({ meetingId, userId }) => {
+      socket.to(meetingId).emit('screen:share-stopped', { userId });
+      console.log(`📺 ${userId} stopped screen sharing in meeting ${meetingId}`);
+    });
+
     socket.on('disconnect', () => {
       onlineUsers.forEach((socketId, userId) => {
         if (socketId === socket.id) {
