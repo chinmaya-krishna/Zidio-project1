@@ -66,100 +66,74 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
   };
 
   const requestTrack = async (kind: 'audio' | 'video') => {
-    // Try multiple constraint strategies in order
-    const constraintStrategies = [];
-    
-    if (kind === 'audio') {
-      // Strategy 1: Advanced audio constraints (best)
-      constraintStrategies.push({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      // Strategy 2: Basic audio (fallback)
-      constraintStrategies.push({ audio: true });
-    } else if (kind === 'video') {
-      // Strategy 1: Mobile-friendly with facing mode
-      constraintStrategies.push({
-        video: {
+    try {
+      // On mobile, request both audio and video together for better compatibility
+      const isAudio = kind === 'audio';
+      const isVideo = kind === 'video';
+      
+      const constraints = {
+        audio: isAudio || isVideo ? true : false,
+        video: isVideo ? true : false,
+      };
+
+      if (isVideo) {
+        (constraints.video as any) = {
           facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 },
-        },
-      });
-      // Strategy 2: Without facing mode
-      constraintStrategies.push({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
-      // Strategy 3: Minimal video (fallback)
-      constraintStrategies.push({ video: true });
-    }
-
-    let lastError: any = null;
-    
-    for (let i = 0; i < constraintStrategies.length; i++) {
-      try {
-        const trackStream = await navigator.mediaDevices.getUserMedia(constraintStrategies[i]);
-        const tracks = trackStream.getTracks();
-        
-        if (tracks.length === 0) {
-          throw new Error(`Unable to get ${kind} track`);
-        }
-
-        let stream = streamRef.current;
-        if (!stream) {
-          stream = new MediaStream();
-          streamRef.current = stream;
-        }
-
-        for (const track of tracks) {
-          if (!stream.getTracks().some((t) => t.id === track.id)) {
-            stream.addTrack(track);
-          }
-        }
-
-        streamRef.current = stream;
-        setLocalStream(new MediaStream(stream.getTracks()));
-        setIsMediaReady(true);
-
-        if (stream.getVideoTracks().length) {
-          updateLocalVideo();
-          setIsCameraOn(true);
-        }
-        if (stream.getAudioTracks().length) {
-          setIsMicOn(true);
-        }
-
-        if (stream.getAudioTracks().length) {
-          socket?.emit('meeting:mute', { meetingId, userId, isMuted: false });
-        }
-
-        for (const track of tracks) {
-          await addTrackToPeers(track);
-        }
-
-        console.log(`✅ Successfully requested ${kind} track with strategy ${i + 1}`);
-        return; // Success!
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`Strategy ${i + 1} failed for ${kind}:`, err.name, err.message);
-        
-        // If user denied permission, don't try fallbacks
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          throw err;
-        }
-        
-        // Continue to next strategy
+        };
       }
-    }
 
-    // All strategies failed
-    throw lastError || new Error(`Unable to get ${kind} track after all attempts`);
+      const trackStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const tracks = trackStream.getTracks();
+      
+      if (tracks.length === 0) {
+        throw new Error(`Unable to get ${kind} track`);
+      }
+
+      let stream = streamRef.current;
+      if (!stream) {
+        stream = new MediaStream();
+        streamRef.current = stream;
+      }
+
+      for (const track of tracks) {
+        const existing = stream.getTracks().find((t) => t.kind === track.kind);
+        if (existing) {
+          stream.removeTrack(existing);
+          existing.stop();
+        }
+        stream.addTrack(track);
+      }
+
+      streamRef.current = stream;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setIsMediaReady(true);
+
+      // Update state based on what tracks we have
+      const hasVideo = stream.getVideoTracks().length > 0;
+      const hasAudio = stream.getAudioTracks().length > 0;
+
+      if (hasVideo) {
+        updateLocalVideo();
+        setIsCameraOn(true);
+      }
+      if (hasAudio) {
+        setIsMicOn(true);
+        socket?.emit('meeting:mute', { meetingId, userId, isMuted: false });
+      }
+
+      // Add all new tracks to peers
+      for (const track of tracks) {
+        await addTrackToPeers(track);
+      }
+
+      console.log(`✅ Successfully requested ${kind} track - Video: ${hasVideo}, Audio: ${hasAudio}`);
+    } catch (err: any) {
+      console.error(`Error requesting ${kind} track:`, err.name, err.message);
+      setMediaError(err.message || `Failed to access ${kind}`);
+      throw err;
+    }
   };
 
   const addTrackToPeers = async (track: MediaStreamTrack) => {
