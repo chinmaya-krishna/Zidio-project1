@@ -235,10 +235,12 @@ const MeetingRoom = () => {
             </div>
 
             <div className="flex justify-center gap-2 sm:gap-4 py-3 sm:py-4 flex-wrap">
-              <button onClick={async () => { try { await toggleMic(); } catch(e: any){ console.error('Mic error:', e); } }} className={`p-3 rounded-full transition ${isMicOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isMicOn ? '🎤' : '🔇'}</button>
-              <button onClick={async () => { try { await toggleCamera(); } catch(e){console.error(e)} }} className={`p-3 rounded-full transition ${isCameraOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isCameraOn ? '📹' : '📷'}</button>
+              <button onClick={async () => { try { await toggleMic(); } catch(e: any){ console.error('Mic error:', e); } }} disabled={isMediaLoading} className={`p-3 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${isMicOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isMicOn ? '🎤' : '🔇'}</button>
+              <button onClick={async () => { try { await toggleCamera(); } catch(e){console.error(e)} }} disabled={isMediaLoading} className={`p-3 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${isCameraOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isCameraOn ? '📹' : '📷'}</button>
               <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 transition">💬</button>
             </div>
+            
+            {mediaError && <p className="text-center text-sm text-amber-400 mt-2">{mediaError}</p>}
           </div>
 
           {showChat && (
