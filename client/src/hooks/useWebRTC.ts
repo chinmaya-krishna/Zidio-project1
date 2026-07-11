@@ -66,47 +66,113 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
   };
 
   const requestTrack = async (kind: 'audio' | 'video') => {
-    const constraints = {
-      audio: kind === 'audio',
-      video: kind === 'video',
-    };
-
-    const trackStream = await navigator.mediaDevices.getUserMedia(constraints);
-    const tracks = trackStream.getTracks();
-    if (tracks.length === 0) {
-      throw new Error(`Unable to get ${kind} track`);
+    let constraints: any = {};
+    
+    if (kind === 'audio') {
+      constraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      };
+    } else if (kind === 'video') {
+      // Mobile-friendly video constraints with fallback for desktop
+      constraints = {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
     }
 
-    let stream = streamRef.current;
-    if (!stream) {
-      stream = new MediaStream();
-      streamRef.current = stream;
-    }
-
-    for (const track of tracks) {
-      if (!stream.getTracks().some((t) => t.id === track.id)) {
-        stream.addTrack(track);
+    try {
+      const trackStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const tracks = trackStream.getTracks();
+      if (tracks.length === 0) {
+        throw new Error(`Unable to get ${kind} track`);
       }
-    }
 
-    streamRef.current = stream;
-    setLocalStream(new MediaStream(stream.getTracks()));
-    setIsMediaReady(true);
+      let stream = streamRef.current;
+      if (!stream) {
+        stream = new MediaStream();
+        streamRef.current = stream;
+      }
 
-    if (stream.getVideoTracks().length) {
-      updateLocalVideo();
-      setIsCameraOn(true);
-    }
-    if (stream.getAudioTracks().length) {
-      setIsMicOn(true);
-    }
+      for (const track of tracks) {
+        if (!stream.getTracks().some((t) => t.id === track.id)) {
+          stream.addTrack(track);
+        }
+      }
 
-    if (stream.getAudioTracks().length) {
-      socket?.emit('meeting:mute', { meetingId, userId, isMuted: false });
-    }
+      streamRef.current = stream;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setIsMediaReady(true);
 
-    for (const track of tracks) {
-      await addTrackToPeers(track);
+      if (stream.getVideoTracks().length) {
+        updateLocalVideo();
+        setIsCameraOn(true);
+      }
+      if (stream.getAudioTracks().length) {
+        setIsMicOn(true);
+      }
+
+      if (stream.getAudioTracks().length) {
+        socket?.emit('meeting:mute', { meetingId, userId, isMuted: false });
+      }
+
+      for (const track of tracks) {
+        await addTrackToPeers(track);
+      }
+    } catch (err: any) {
+      console.error(`Error requesting ${kind} track:`, err);
+      
+      // Fallback: try without specific constraints for mobile compatibility
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        throw err; // User denied permission
+      }
+      
+      // Try with minimal constraints as fallback
+      try {
+        const fallbackConstraints = kind === 'audio' ? { audio: true } : { video: true };
+        const trackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        const tracks = trackStream.getTracks();
+        
+        let stream = streamRef.current;
+        if (!stream) {
+          stream = new MediaStream();
+          streamRef.current = stream;
+        }
+
+        for (const track of tracks) {
+          if (!stream.getTracks().some((t) => t.id === track.id)) {
+            stream.addTrack(track);
+          }
+        }
+
+        streamRef.current = stream;
+        setLocalStream(new MediaStream(stream.getTracks()));
+        setIsMediaReady(true);
+
+        if (stream.getVideoTracks().length) {
+          updateLocalVideo();
+          setIsCameraOn(true);
+        }
+        if (stream.getAudioTracks().length) {
+          setIsMicOn(true);
+        }
+
+        if (stream.getAudioTracks().length) {
+          socket?.emit('meeting:mute', { meetingId, userId, isMuted: false });
+        }
+
+        for (const track of tracks) {
+          await addTrackToPeers(track);
+        }
+      } catch (fallbackErr) {
+        throw fallbackErr;
+      }
     }
   };
 
