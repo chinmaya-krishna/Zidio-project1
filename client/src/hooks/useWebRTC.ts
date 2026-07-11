@@ -66,6 +66,9 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
   };
 
   const requestTrack = async (kind: 'audio' | 'video') => {
+    setIsMediaLoading(true);
+    setMediaError(null);
+    
     try {
       // On mobile, request both audio and video together for better compatibility
       const isAudio = kind === 'audio';
@@ -131,8 +134,13 @@ export const useWebRTC = (socket: Socket | null, meetingId: string, userId: stri
       console.log(`✅ Successfully requested ${kind} track - Video: ${hasVideo}, Audio: ${hasAudio}`);
     } catch (err: any) {
       console.error(`Error requesting ${kind} track:`, err.name, err.message);
-      setMediaError(err.message || `Failed to access ${kind}`);
+      const errorMsg = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' 
+        ? `Permission denied. Please allow ${kind} access in your browser settings.`
+        : err.message || `Failed to access ${kind}`;
+      setMediaError(errorMsg);
       throw err;
+    } finally {
+      setIsMediaLoading(false);
     }
   };
 
