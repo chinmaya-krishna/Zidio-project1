@@ -189,10 +189,10 @@ const MeetingRoom = () => {
       </div>
 
       {hasJoinedRoom ? (
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 flex flex-col p-4 min-h-0">
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 auto-rows-fr min-h-0">
-              <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[220px]">
+        <div className="flex flex-1 overflow-hidden h-screen">
+          <div className="flex-1 flex flex-col p-3 sm:p-4 min-h-0 w-full">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 auto-rows-fr min-h-0 overflow-y-auto">
+              <div className="bg-black rounded-lg relative overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[220px]">
                 <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
                 <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/60 px-2 py-1 text-xs">
                   <span>You</span>
@@ -234,16 +234,19 @@ const MeetingRoom = () => {
               }
             </div>
 
-            <div className="flex justify-center gap-4 py-4">
-              <button onClick={async () => { try { await toggleMic(); } catch(e){console.error(e)} }} className={`p-3 rounded-full transition ${isMicOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isMicOn ? '🎤' : '🔇'}</button>
+            <div className="flex justify-center gap-2 sm:gap-4 py-3 sm:py-4 flex-wrap">
+              <button onClick={async () => { try { await toggleMic(); } catch(e: any){ console.error('Mic error:', e); } }} className={`p-3 rounded-full transition ${isMicOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isMicOn ? '🎤' : '🔇'}</button>
               <button onClick={async () => { try { await toggleCamera(); } catch(e){console.error(e)} }} className={`p-3 rounded-full transition ${isCameraOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}>{isCameraOn ? '📹' : '📷'}</button>
               <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 transition">💬</button>
             </div>
           </div>
 
           {showChat && (
-            <div className="w-80 bg-gray-800 flex flex-col">
-              <div className="p-4 border-b border-gray-700">
+            <div className="fixed inset-0 z-40 lg:static lg:w-80 lg:relative bg-gray-800 flex flex-col lg:border-l lg:border-gray-700 overflow-hidden">
+              {/* Mobile close button */}
+              <button onClick={() => setShowChat(false)} className="lg:hidden absolute top-4 right-4 text-white text-2xl z-50">✕</button>
+              
+              <div className="p-4 border-b border-gray-700 lg:border-b">
                 <h2 className="font-semibold mb-3 text-sm">Participants ({participantCount})</h2>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {participants.map((p: any) => (
